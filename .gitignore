@@ -1,0 +1,10 @@
+# Generated output
+build/
+core-classes/
+dist/
+
+# Downloaded SQuirreL source/distributions used only for local API verification
+squirrel-sql-code/
+squirrel-5.1.0/
+squirrel-5.1.0-dist/
+squirrelsql-*-standard.zip

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="squirrel-vim" default="test" basedir=".">
+    <property name="src.dir" location="src"/>
+    <property name="test.dir" location="test"/>
+    <property name="build.dir" location="build"/>
+    <property name="classes.dir" location="${build.dir}/classes"/>
+    <property name="test.classes.dir" location="${build.dir}/test-classes"/>
+    <property name="dist.dir" location="dist"/>
+    <!-- Set -Dsquirrel.home to a SQuirreL 5.1.0 installation when packaging. -->
+    <property name="squirrel.home" location="squirrel-home"/>
+
+    <path id="squirrel.classpath">
+        <fileset dir="${squirrel.home}/lib" includes="*.jar" erroronmissingdir="false"/>
+        <pathelement location="${squirrel.home}/squirrel-sql.jar"/>
+    </path>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${dist.dir}"/>
+    </target>
+
+    <target name="compile-tests" depends="compile-plugin">
+        <mkdir dir="${test.classes.dir}"/>
+        <javac srcdir="${test.dir}" destdir="${test.classes.dir}" includeantruntime="false" release="17">
+            <classpath refid="squirrel.classpath"/>
+            <classpath><pathelement location="${classes.dir}"/></classpath>
+        </javac>
+    </target>
+
+    <target name="test" depends="compile-tests">
+        <java classname="com.squirrelvim.integration.SqlEditorObserverTest" fork="true" failonerror="true">
+            <classpath><pathelement location="${test.classes.dir}"/></classpath>
+        </java>
+        <java classname="com.squirrelvim.engine.VimEngineTest" fork="true" failonerror="true">
+            <classpath><pathelement location="${classes.dir}"/></classpath>
+            <classpath><pathelement location="${test.classes.dir}"/></classpath>
+        </java>
+        <java classname="com.squirrelvim.PluginBinaryCompatibilityTest" fork="true" failonerror="true">
+            <classpath refid="squirrel.classpath"/>
+            <classpath><pathelement location="${classes.dir}"/></classpath>
+            <classpath><pathelement location="${test.classes.dir}"/></classpath>
+        </java>
+    </target>
+
+    <target name="compile-plugin">
+        <mkdir dir="${classes.dir}"/>
+        <javac srcdir="${src.dir}" destdir="${classes.dir}" includeantruntime="false" release="17">
+            <classpath refid="squirrel.classpath"/>
+        </javac>
+    </target>
+
+    <target name="package" depends="compile-plugin">
+        <mkdir dir="${dist.dir}"/>
+        <jar destfile="${dist.dir}/squirrel-vim.jar" basedir="${classes.dir}"/>
+    </target>
+</project>
