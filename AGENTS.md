@@ -81,26 +81,6 @@ C:\Progra~1\Java\jdk-17\bin\java.exe
 Manual JDK-17 compilation and test commands were used. Do not report `ant
 test` as verified until Ant is installed and that target passes.
 
-## Packaging dependencies
-
-Build the plugin with JDK 17 and the official SQuirreL 5.1.0 plain-ZIP
-distribution. The required compile-time API is:
-
-- `squirrel-5.1.0-dist/squirrelsql-5.1.0-standard/squirrel-sql.jar`
-
-The SQuirreL installation's `lib/*.jar` files are supplied by the host at
-runtime. Do **not** shade, copy, or otherwise bundle `squirrel-sql.jar` or
-any `lib/*.jar` dependency into `dist/squirrel-vim.jar`; it must contain only
-the plugin's own `com/squirrelvim/**` classes (and any future plugin-owned
-resources). Compile against the installed `squirrel-sql.jar`, then run the
-binary-compatibility test with that JAR on the classpath before handing off a
-release artifact.
-
-If the plain-ZIP distribution is absent, obtain the official
-`squirrelsql-5.1.0-standard.zip` and extract it under
-`squirrel-5.1.0-dist/` before packaging. The archive is a build dependency,
-not a release artifact.
-
 ## Important remaining work
 
 1. Replace Java registry preferences with normal SQuirreL plugin settings.

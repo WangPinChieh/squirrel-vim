@@ -3,7 +3,7 @@ package com.squirrelvim.engine;
 /** Focused MVP command regression tests, run without SQuirreL. */
 public final class VimEngineTest {
     public static void main(String[] args) {
-        modesAndInsert(); motionsAndCounts(); operatorsAndRegisters(); textObjects(); visualAndSearch(); edgeCases();
+        modesAndInsert(); motionsAndCounts(); operatorsAndRegisters(); visualAndSearch(); edgeCases();
     }
     private static void modesAndInsert() {
         Fake e = new Fake("select one"); VimEngine v = new VimEngine(e);
@@ -20,19 +20,6 @@ public final class VimEngineTest {
         v.key("d");v.key("w");eq("two\nthree\nfour",e.getText()); eq("one ",v.getRegister().text());
         v.key("2");v.key("d");v.key("d");eq("four",e.getText());eq(true,v.getRegister().lineWise());
         v.key("P");eq("two\nthree\nfour",e.getText());
-    }
-    private static void textObjects() {
-        Fake e = new Fake("select customer_id from orders"); VimEngine v = new VimEngine(e);
-        v.key("w"); v.key("d"); v.key("i"); v.key("w");
-        eq("select  from orders", e.getText()); eq("customer_id", v.getRegister().text());
-
-        e = new Fake("select customer_id from orders"); v = new VimEngine(e);
-        v.key("w"); v.key("c"); v.key("i"); v.key("w");
-        eq("select  from orders", e.getText()); eq(VimMode.INSERT, v.getMode());
-
-        e = new Fake("one two three"); v = new VimEngine(e);
-        v.key("2"); v.key("d"); v.key("i"); v.key("w");
-        eq(" three", e.getText()); eq("one two", v.getRegister().text());
     }
     private static void visualAndSearch() {
         Fake e=new Fake("alpha beta\nalpha"); VimEngine v=new VimEngine(e);

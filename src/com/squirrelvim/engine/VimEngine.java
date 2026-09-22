@@ -43,7 +43,6 @@ public final class VimEngine {
             String was = pending; pending = null;
             if ("g".equals(was) && "g".equals(key)) { setCaret(0); return; }
             if ("r".equals(was) && key.length() == 1) { replaceChar(key); return; }
-            if (was.startsWith("text-object:")) { applyTextObject(was, key); return; }
             reset(); return;
         }
         if (pendingOperator != null) { operatorKey(key, n); return; }
@@ -75,7 +74,6 @@ public final class VimEngine {
         int start = caret(), end;
         if (key.equals(String.valueOf(op))) { start = lineStart(start); end = start; for (int i = 0; i < n; i++) end = lineEndWithNewline(end); applyOperator(op, start, end, true); return; }
         if (key.equals("D") && op == 'd' || key.equals("C") && op == 'c') { end = lineEnd(start); applyOperator(op, start, end, false); return; }
-        if (key.equals("i")) { pending = "text-object:" + op + ":" + n; return; }
         end = motionTarget(key, n);
         if (end < 0) { reset(); return; }
         if (key.equals("w")) end = Math.max(start, end);
@@ -83,16 +81,6 @@ public final class VimEngine {
         else if (end >= start && key.equals("e")) end = Math.min(length(), end + 1);
         int lo = Math.min(start, end), hi = Math.max(start, end);
         applyOperator(op, lo, hi, false);
-    }
-
-    private void applyTextObject(String command, String key) {
-        String[] parts = command.split(":");
-        if (!"w".equals(key)) { reset(); return; }
-        char op = parts[1].charAt(0);
-        int n = Integer.parseInt(parts[2]);
-        int[] range = innerWordRange(caret(), n);
-        if (range != null) applyOperator(op, range[0], range[1], false);
-        else reset();
     }
 
     private void applyOperator(char op, int start, int end, boolean lineWise) {
@@ -167,21 +155,5 @@ public final class VimEngine {
     private int wordsForward(int p,int n){String t=editor.getText();for(int k=0;k<n;k++){while(p<t.length()&&word(t.charAt(p)))p++;while(p<t.length()&&!word(t.charAt(p)))p++;}return Math.min(Math.max(0,t.length()-1),p);}
     private int wordsBack(int p,int n){String t=editor.getText();for(int k=0;k<n;k++){p=Math.max(0,p-1);while(p>0&&!word(t.charAt(p)))p--;while(p>0&&word(t.charAt(p-1)))p--;}return p;}
     private int wordEnd(int p,int n){String t=editor.getText();for(int k=0;k<n;k++){while(p<t.length()&&!word(t.charAt(p)))p++;while(p<t.length()-1&&word(t.charAt(p+1)))p++;if(k<n-1)p++;}return Math.min(Math.max(0,t.length()-1),p);}
-    /** Returns a characterwise inner-word range; whitespace is excluded. */
-    private int[] innerWordRange(int p, int n) {
-        String t = editor.getText();
-        if (t.isEmpty()) return null;
-        p = Math.max(0, Math.min(t.length() - 1, p));
-        while (p < t.length() && !word(t.charAt(p))) p++;
-        if (p == t.length()) return null;
-        int start = p;
-        while (start > 0 && word(t.charAt(start - 1))) start--;
-        int end = p;
-        for (int i = 0; i < n; i++) {
-            while (end < t.length() && word(t.charAt(end))) end++;
-            if (i < n - 1) while (end < t.length() && !word(t.charAt(end))) end++;
-        }
-        return new int[] { start, end };
-    }
     private int paragraph(int p,int direction){for(int k=0;k<Math.abs(direction);k++){if(direction>0){p=nextLine(p);while(p<length()&&lineStart(p)!=lineEnd(p))p=nextLine(p);while(p<length()&&lineStart(p)==lineEnd(p))p=nextLine(p);}else{p=lineStart(p);if(p>0)p=lineStart(p-1);while(p>0&&lineStart(p)!=lineEnd(p))p=lineStart(p-1);}}return p;}
 }

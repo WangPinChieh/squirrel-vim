@@ -10,7 +10,6 @@
 | counts | Yes | Examples: `3j`, `5w`, `3dd`, `2dw`, `10G` |
 | `x dd D dw de d$` | Mostly | Composable delete supports motions; `d$` and `D` supported |
 | `cc C cw` | Mostly | Composable change supports motions |
-| `diw ciw` | Yes | Delete or change the inner word under the cursor; counts are supported |
 | `yy Y p P` | Yes | One unnamed character/line register |
 | `u Ctrl-r` | Delegated | Uses SQuirreL editor undo/redo actions when available |
 | `r<char>` | Yes | Replace one character |
