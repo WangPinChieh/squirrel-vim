@@ -10,7 +10,6 @@ import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.ScrollPaneConstants;
-import javax.swing.text.Caret;
 
 /** Installs Vim handling only on one recognized SQL editor. */
 public final class VimEditorController {
@@ -19,8 +18,6 @@ public final class VimEditorController {
     private final KeyAdapter listener;
     private final JScrollPane scrollPane;
     private final Component originalCorner;
-    private final Caret originalCaret;
-    private final VimCaret vimCaret = new VimCaret(false);
     private final JLabel indicator = new JLabel();
     private final Runnable executeCurrent;
     private final Runnable executeSelection;
@@ -37,7 +34,6 @@ public final class VimEditorController {
         this.executeSelection = executeSelection;
         this.clearEditor = clearEditor;
         this.originalCorner = scrollPane == null ? null : scrollPane.getCorner(ScrollPaneConstants.LOWER_RIGHT_CORNER);
-        this.originalCaret = area.getCaret();
         this.engine = new VimEngine(new SwingVimEditor(area));
         this.listener = new KeyAdapter() {
             @Override public void keyPressed(KeyEvent e) { pressed(e); }
@@ -47,8 +43,8 @@ public final class VimEditorController {
     public void setEnabled(boolean enabled) {
         if (this.enabled == enabled) return;
         this.enabled = enabled;
-        if (enabled) { area.addKeyListener(listener); area.setCaret(vimCaret); if (showIndicator) installIndicator(); updateModeUi(); }
-        else { area.removeKeyListener(listener); area.setCaret(originalCaret); removeIndicator(); }
+        if (enabled) { area.addKeyListener(listener); if (showIndicator) installIndicator(); updateIndicator(); }
+        else { area.removeKeyListener(listener); removeIndicator(); }
     }
     public boolean isEnabled() { return enabled; }
     public VimMode getMode() { return engine.getMode(); }
@@ -63,7 +59,7 @@ public final class VimEditorController {
         else if (e.isControlDown() && e.getKeyCode() == KeyEvent.VK_D) key = "<C-d>";
         else if (e.isControlDown() && e.getKeyCode() == KeyEvent.VK_U) key = "<C-u>";
         else if (e.getKeyCode() == KeyEvent.VK_ENTER && (engine.getMode() == VimMode.SEARCH_FORWARD || engine.getMode() == VimMode.SEARCH_BACKWARD)) key = "<Enter>";
-        if (key != null) { engine.key(key); e.consume(); updateModeUi(); }
+        if (key != null) { engine.key(key); e.consume(); updateIndicator(); }
     }
     private void typed(KeyEvent e) {
         if (!enabled || e.isConsumed() || e.isControlDown() || e.isAltDown()) return;
@@ -71,13 +67,10 @@ public final class VimEditorController {
             String key = String.valueOf(e.getKeyChar());
             if (leaderPending) { leaderPending=false; if ("e".equals(key)) executeCurrent.run(); else if ("E".equals(key)) executeSelection.run(); else if ("c".equals(key)) clearEditor.run(); e.consume(); return; }
             if (key.equals(leader)) { leaderPending=true; e.consume(); return; }
-            engine.key(key); e.consume(); updateModeUi();
+            engine.key(key); e.consume(); updateIndicator();
         }
     }
     private void installIndicator() { if (scrollPane != null) scrollPane.setCorner(ScrollPaneConstants.LOWER_RIGHT_CORNER, indicator); }
     private void removeIndicator() { if (scrollPane != null) scrollPane.setCorner(ScrollPaneConstants.LOWER_RIGHT_CORNER, originalCorner); }
-    private void updateModeUi() {
-        vimCaret.setInsertMode(engine.getMode() == VimMode.INSERT);
-        indicator.setText(" -- " + engine.getMode().name().replace('_', '-') + " -- ");
-    }
+    private void updateIndicator() { indicator.setText(" -- " + engine.getMode().name().replace('_', '-') + " -- "); }
 }

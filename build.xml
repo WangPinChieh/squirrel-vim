@@ -31,10 +31,6 @@
         <java classname="com.squirrelvim.integration.SqlEditorObserverTest" fork="true" failonerror="true">
             <classpath><pathelement location="${test.classes.dir}"/></classpath>
         </java>
-        <java classname="com.squirrelvim.integration.VimEditorControllerCaretTest" fork="true" failonerror="true">
-            <classpath><pathelement location="${classes.dir}"/></classpath>
-            <classpath><pathelement location="${test.classes.dir}"/></classpath>
-        </java>
         <java classname="com.squirrelvim.engine.VimEngineTest" fork="true" failonerror="true">
             <classpath><pathelement location="${classes.dir}"/></classpath>
             <classpath><pathelement location="${test.classes.dir}"/></classpath>
