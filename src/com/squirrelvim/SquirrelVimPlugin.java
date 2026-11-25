@@ -69,7 +69,13 @@ public final class SquirrelVimPlugin extends DefaultSessionPlugin {
         if (editors.containsKey(panel)) {
             return;
         }
-        VimEditorController controller = new VimEditorController(panel.getSQLEntryPanel().getTextComponent(), panel.getSQLEntryPanel().getTextAreaEmbeddedInScrollPane(), panel::executeCurrentSQL, () -> panel.executeSQL(panel.getSelectedSQLScript()), () -> panel.setEntireSQLScript("", false));
+        VimEditorController controller = new VimEditorController(
+                panel.getSQLEntryPanel().getTextComponent(),
+                panel.getSQLEntryPanel().getTextAreaEmbeddedInScrollPane(),
+                panel::executeCurrentSQL,
+                () -> panel.executeSQL(panel.getSelectedSQLScript()),
+                () -> panel.setEntireSQLScript("", false),
+                () -> panel.getUndoRedoActionContext().getUndoManager());
         controller.setEnabled(enabled);
         controller.applyPreferences(preferences);
         editors.put(panel, controller);

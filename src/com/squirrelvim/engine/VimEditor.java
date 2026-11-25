@@ -9,6 +9,8 @@ public interface VimEditor {
     void select(int start, int end);
     int getSelectionStart();
     int getSelectionEnd();
+    default void beginCompoundEdit() {}
+    default void endCompoundEdit() {}
     void undo();
     void redo();
 }

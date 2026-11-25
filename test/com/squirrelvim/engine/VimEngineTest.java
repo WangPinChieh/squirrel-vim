@@ -3,7 +3,7 @@ package com.squirrelvim.engine;
 /** Focused MVP command regression tests, run without SQuirreL. */
 public final class VimEngineTest {
     public static void main(String[] args) {
-        modesAndInsert(); motionsAndCounts(); operatorsAndRegisters(); textObjects(); visualAndSearch(); edgeCases();
+        modesAndInsert(); motionsAndCounts(); operatorsAndRegisters(); textObjects(); visualInnerWord(); findCharacter(); visualAndSearch(); edgeCases();
     }
     private static void modesAndInsert() {
         Fake e = new Fake("select one"); VimEngine v = new VimEngine(e);
@@ -34,6 +34,52 @@ public final class VimEngineTest {
         v.key("2"); v.key("d"); v.key("i"); v.key("w");
         eq(" three", e.getText()); eq("one two", v.getRegister().text());
     }
+    private static void visualInnerWord() {
+        Fake e = new Fake("select customer_id  ,() from");
+        VimEngine v = new VimEngine(e);
+        e.setCaretOffset(11);
+        v.key("v"); v.key("i"); v.key("w");
+        eq(VimMode.VISUAL, v.getMode());
+        eq(7, e.getSelectionStart());
+        eq(18, e.getSelectionEnd());
+        v.key("y");
+        eq("customer_id", v.getRegister().text());
+
+        e.setCaretOffset(18);
+        v.key("v"); v.key("i"); v.key("w"); v.key("y");
+        eq("  ", v.getRegister().text());
+
+        e.setCaretOffset(21);
+        v.key("v"); v.key("i"); v.key("w"); v.key("y");
+        eq(",()", v.getRegister().text());
+
+        e = new Fake("last");
+        v = new VimEngine(e);
+        e.setCaretOffset(3);
+        v.key("v"); v.key("i"); v.key("w"); v.key("d");
+        eq("", e.getText());
+    }
+
+    private static void findCharacter() {
+        Fake e = new Fake("a1 a1 a0\\\na1 z");
+        VimEngine v = new VimEngine(e);
+        v.key("2"); v.key("f"); v.key("1");
+        eq(4, e.getCaretOffset());
+        v.key("f"); v.key("1");
+        eq(4, e.getCaretOffset());
+        v.key("2"); v.key("f"); v.key("0");
+        eq(4, e.getCaretOffset());
+        v.key("f"); v.key("0");
+        eq(7, e.getCaretOffset());
+        v.key("f"); v.key("\\");
+        eq(8, e.getCaretOffset());
+        v.key("f"); v.key("<Esc>"); v.key("h");
+        eq(7, e.getCaretOffset());
+        eq(VimMode.NORMAL, v.getMode());
+        v.key("0"); v.key("f"); v.key(" ");
+        eq(2, e.getCaretOffset());
+    }
+
     private static void visualAndSearch() {
         Fake e=new Fake("alpha beta\nalpha"); VimEngine v=new VimEngine(e);
         v.key("v");v.key("l");v.key("y");eq("al",v.getRegister().text());eq(VimMode.NORMAL,v.getMode());

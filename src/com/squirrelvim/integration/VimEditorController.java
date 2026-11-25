@@ -6,10 +6,12 @@ import com.squirrelvim.config.VimPreferences;
 import java.awt.Component;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.util.function.Supplier;
 import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.undo.UndoManager;
 
 /** Installs Vim handling only on one recognized SQL editor. */
 public final class VimEditorController {
@@ -28,13 +30,19 @@ public final class VimEditorController {
     private boolean leaderPending;
 
     public VimEditorController(JTextArea area, JScrollPane scrollPane, Runnable executeCurrent, Runnable executeSelection, Runnable clearEditor) {
+        this(area, scrollPane, executeCurrent, executeSelection, clearEditor, () -> null);
+    }
+
+    public VimEditorController(JTextArea area, JScrollPane scrollPane, Runnable executeCurrent,
+                               Runnable executeSelection, Runnable clearEditor,
+                               Supplier<? extends UndoManager> undoManager) {
         this.area = area;
         this.scrollPane = scrollPane;
         this.executeCurrent = executeCurrent;
         this.executeSelection = executeSelection;
         this.clearEditor = clearEditor;
         this.originalCorner = scrollPane == null ? null : scrollPane.getCorner(ScrollPaneConstants.LOWER_RIGHT_CORNER);
-        this.engine = new VimEngine(new SwingVimEditor(area));
+        this.engine = new VimEngine(new SwingVimEditor(area, undoManager));
         this.listener = new KeyAdapter() {
             @Override public void keyPressed(KeyEvent e) { pressed(e); }
             @Override public void keyTyped(KeyEvent e) { typed(e); }
@@ -44,7 +52,7 @@ public final class VimEditorController {
         if (this.enabled == enabled) return;
         this.enabled = enabled;
         if (enabled) { area.addKeyListener(listener); if (showIndicator) installIndicator(); updateIndicator(); }
-        else { area.removeKeyListener(listener); removeIndicator(); }
+        else { engine.finishInsertEdit(); area.removeKeyListener(listener); removeIndicator(); }
     }
     public boolean isEnabled() { return enabled; }
     public VimMode getMode() { return engine.getMode(); }
@@ -66,7 +74,7 @@ public final class VimEditorController {
         if (engine.getMode() != VimMode.INSERT) {
             String key = String.valueOf(e.getKeyChar());
             if (leaderPending) { leaderPending=false; if ("e".equals(key)) executeCurrent.run(); else if ("E".equals(key)) executeSelection.run(); else if ("c".equals(key)) clearEditor.run(); e.consume(); return; }
-            if (key.equals(leader)) { leaderPending=true; e.consume(); return; }
+            if (key.equals(leader) && !engine.isWaitingForFindCharacter()) { leaderPending=true; e.consume(); return; }
             engine.key(key); e.consume(); updateIndicator();
         }
     }
