@@ -1,5 +1,7 @@
 package com.squirrelvim.engine;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Objects;
 
 /**
@@ -105,10 +107,16 @@ public final class VimEngine {
 
     private void applyTextObject(String command, String key) {
         String[] parts = command.split(":");
-        if (!"w".equals(key)) { reset(); return; }
         char op = parts[1].charAt(0);
         int n = Integer.parseInt(parts[2]);
-        int[] range = innerWordRange(caret(), n);
+        int[] range = switch (key) {
+            case "w" -> innerWordRange(caret(), n);
+            case "'", "\"" -> n == 1 ? innerQuoteRange(caret(), key.charAt(0)) : null;
+            case "(", ")", "b" -> innerBracketRange(caret(), '(', ')', n);
+            case "[", "]" -> innerBracketRange(caret(), '[', ']', n);
+            case "{", "}", "B" -> innerBracketRange(caret(), '{', '}', n);
+            default -> null;
+        };
         if (range != null) applyOperator(op, range[0], range[1], false);
         else reset();
     }
@@ -182,7 +190,7 @@ public final class VimEngine {
     }
     private void changeRange(int start, int end, boolean lineWise) {
         if (end <= start) {
-            mode = VimMode.INSERT;
+            startInsertEdit(() -> { editor.setCaretOffset(start); reset(); });
             return;
         }
         startInsertEdit(() -> deleteRange(start, end, lineWise));
@@ -272,6 +280,70 @@ public final class VimEngine {
     private int wordsForward(int p,int n){String t=editor.getText();for(int k=0;k<n;k++){while(p<t.length()&&word(t.charAt(p)))p++;while(p<t.length()&&!word(t.charAt(p)))p++;}return Math.min(Math.max(0,t.length()-1),p);}
     private int wordsBack(int p,int n){String t=editor.getText();for(int k=0;k<n;k++){p=Math.max(0,p-1);while(p>0&&!word(t.charAt(p)))p--;while(p>0&&word(t.charAt(p-1)))p--;}return p;}
     private int wordEnd(int p,int n){String t=editor.getText();for(int k=0;k<n;k++){while(p<t.length()&&!word(t.charAt(p)))p++;while(p<t.length()-1&&word(t.charAt(p+1)))p++;if(k<n-1)p++;}return Math.min(Math.max(0,t.length()-1),p);}
+    /** Finds an enclosing or next quote pair on this line, with SQL doubled quotes. */
+    private int[] innerQuoteRange(int position, char quote) {
+        String text = editor.getText();
+        int end = lineEnd(position);
+        for (int i = lineStart(position); i < end; i++) {
+            char ch = text.charAt(i);
+            if (ch == '\\') { i++; continue; }
+            if (ch != quote) continue;
+            int closing = quoteEnd(text, i, end);
+            if (closing < 0) return null;
+            if (position <= closing) return new int[] { i + 1, closing };
+            i = closing;
+        }
+        return null;
+    }
+
+    private int quoteEnd(String text, int opening, int limit) {
+        char quote = text.charAt(opening);
+        for (int i = opening + 1; i < limit; i++) {
+            if (text.charAt(i) == '\\') { i++; continue; }
+            if (text.charAt(i) != quote) continue;
+            if (i + 1 < limit && text.charAt(i + 1) == quote) { i++; continue; }
+            return i;
+        }
+        return -1;
+    }
+
+    /** Counts enclosing pairs from the innermost pair; pairs can span lines. */
+    private int[] innerBracketRange(int position, char opening, char closing, int levels) {
+        String text = editor.getText();
+        Deque<Integer> openings = new ArrayDeque<>();
+        int[] next = null;
+        int lineEnd = lineEnd(position);
+        boolean enclosed = false;
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '-' && i + 1 < text.length() && text.charAt(i + 1) == '-') {
+                int end = text.indexOf('\n', i + 2);
+                if (end < 0) break;
+                i = end;
+            } else if (ch == '/' && i + 1 < text.length() && text.charAt(i + 1) == '*') {
+                int end = text.indexOf("*/", i + 2);
+                if (end < 0) break;
+                i = end + 1;
+            } else if (ch == '\'' || ch == '"') {
+                int end = quoteEnd(text, i, text.length());
+                if (end < 0) break;
+                i = end;
+            } else if (ch == opening) {
+                openings.push(i);
+            } else if (ch == closing && !openings.isEmpty()) {
+                int start = openings.pop();
+                if (start <= position && position <= i) {
+                    enclosed = true;
+                    if (--levels == 0) return new int[] { start + 1, i };
+                } else if (start > position && start < lineEnd &&
+                           (next == null || start < next[0] - 1)) {
+                    next = new int[] { start + 1, i };
+                }
+            }
+        }
+        return !enclosed && levels == 1 ? next : null;
+    }
+
     /** Returns a characterwise inner-word range; whitespace is excluded. */
     private int[] innerWordRange(int p, int n) {
         String t = editor.getText();

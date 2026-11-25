@@ -17,6 +17,36 @@ public final class PluginBinaryCompatibilityTest {
         require("squirrelvim".equals(plugin.getInternalName()), "internal name is stable");
         require("0.1.0-api-spike".equals(plugin.getVersion()), "spike version is exposed");
         SwingUtilities.invokeAndWait(PluginBinaryCompatibilityTest::undoInSqlEditors);
+        SwingUtilities.invokeAndWait(PluginBinaryCompatibilityTest::delimitedChangesInSqlEditors);
+    }
+
+    private static void delimitedChangesInSqlEditors() {
+        String[][] pairs = { {"'", "'", "'"}, {"\"", "\"", "\""},
+                {"(", ")", "()b"}, {"[", "]", "[]"}, {"{", "}", "{}B"} };
+        for (String[] pair : pairs) {
+            for (char key : pair[2].toCharArray()) {
+                for (String contents : new String[] { "old value", "", "\nold\nvalue\n" }) {
+                    if (pair[0].equals(pair[1]) && contents.contains("\n")) continue;
+                    String original = "select " + pair[0] + contents + pair[1];
+                    RSyntaxTextArea area = new RSyntaxTextArea();
+                    area.setText(original); area.discardAllEdits(); area.setCaretPosition(7);
+                    VimEditorController controller = new VimEditorController(area, null, () -> {}, () -> {}, () -> {});
+                    controller.setEnabled(true);
+                    type(area, 'c'); type(area, 'i'); type(area, key);
+                    require(("select " + pair[0] + pair[1]).equals(area.getText()), "ci preserves delimiters: " + key);
+                    require(controller.getMode() == com.squirrelvim.engine.VimMode.INSERT, "ci enters Insert: " + key);
+                    require(area.getCaretPosition() == 8, "ci places caret between delimiters: " + key);
+                    area.replaceSelection("new"); area.replaceSelection(" value");
+                    press(area, KeyEvent.VK_ESCAPE, 0);
+                    String changed = "select " + pair[0] + "new value" + pair[1];
+                    require(changed.equals(area.getText()), "Insert replaces contents: " + key);
+                    type(area, 'u'); require(original.equals(area.getText()), "one undo restores contents: " + key);
+                    press(area, KeyEvent.VK_R, KeyEvent.CTRL_DOWN_MASK);
+                    require(changed.equals(area.getText()), "redo restores change: " + key);
+                    controller.dispose();
+                }
+            }
+        }
     }
 
     private static void undoInSqlEditors() {
@@ -38,6 +68,22 @@ public final class PluginBinaryCompatibilityTest {
         require("select from".equals(syntaxArea.getText()), "one undo restores both parts of the change");
         press(syntaxArea, KeyEvent.VK_R, KeyEvent.CTRL_DOWN_MASK);
         require("foofrom".equals(syntaxArea.getText()), "redo restores the complete change");
+
+        syntaxArea.setText("select 'old value'");
+        syntaxArea.discardAllEdits();
+        syntaxArea.setCaretPosition(11);
+        type(syntaxArea, 'c');
+        type(syntaxArea, 'i');
+        type(syntaxArea, '\'');
+        require("select ''".equals(syntaxArea.getText()), "ci' preserves the SQL quotes");
+        require(controller.getMode() == com.squirrelvim.engine.VimMode.INSERT, "ci' enters Insert mode");
+        syntaxArea.replaceSelection("new value");
+        press(syntaxArea, KeyEvent.VK_ESCAPE, 0);
+        require("select 'new value'".equals(syntaxArea.getText()), "Insert replaces quoted contents");
+        type(syntaxArea, 'u');
+        require("select 'old value'".equals(syntaxArea.getText()), "one undo restores the quoted change");
+        press(syntaxArea, KeyEvent.VK_R, KeyEvent.CTRL_DOWN_MASK);
+        require("select 'new value'".equals(syntaxArea.getText()), "redo restores the quoted change");
 
         syntaxArea.setText("select\n1\nfrom");
         syntaxArea.discardAllEdits();
