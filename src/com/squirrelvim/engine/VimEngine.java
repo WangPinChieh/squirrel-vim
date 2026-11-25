@@ -12,6 +12,10 @@ public final class VimEngine {
     private VimMode mode = VimMode.NORMAL;
     private Register register = Register.EMPTY;
     private int visualAnchor;
+    // The Swing caret moves to the end of a selection. Keep Visual mode's
+    // logical cursor separately so expanding a linewise selection upward is
+    // not affected by that implementation detail.
+    private int visualCursor;
     private int count;
     private int operatorCount = 1;
     private Character pendingOperator;
@@ -103,7 +107,7 @@ public final class VimEngine {
 
     private void visualKey(String key) {
         if ("d".equals(key) || "c".equals(key) || "y".equals(key)) {
-            int a = visualAnchor, b = caret();
+            int a = visualAnchor, b = visualCursor;
             int start = Math.min(a, b), end = Math.max(a, b);
             boolean lines = mode == VimMode.VISUAL_LINE;
             if (lines) { start = lineStart(start); end = lineEndWithNewline(end); }
@@ -114,23 +118,23 @@ public final class VimEngine {
         }
         if ("v".equals(key) && mode == VimMode.VISUAL) { escape(); return; }
         if ("V".equals(key)) { mode = VimMode.VISUAL_LINE; selectVisual(); return; }
-        if (isMotion(key)) { move(key, takeCount()); selectVisual(); }
+        if (isMotion(key)) { visualCursor = motionTarget(visualCursor, key, takeCount()); selectVisual(); }
     }
 
-    private void startVisual(boolean lines) { visualAnchor = caret(); mode = lines ? VimMode.VISUAL_LINE : VimMode.VISUAL; selectVisual(); }
-    private void selectVisual() { int a = visualAnchor, b = caret(); if (mode == VimMode.VISUAL_LINE) editor.select(lineStart(Math.min(a,b)), lineEndWithNewline(Math.max(a,b))); else editor.select(Math.min(a,b), Math.min(length(), Math.max(a,b) + 1)); }
+    private void startVisual(boolean lines) { visualAnchor = caret(); visualCursor = visualAnchor; mode = lines ? VimMode.VISUAL_LINE : VimMode.VISUAL; selectVisual(); }
+    private void selectVisual() { int a = visualAnchor, b = visualCursor; if (mode == VimMode.VISUAL_LINE) editor.select(lineStart(Math.min(a,b)), lineEndWithNewline(Math.max(a,b))); else editor.select(Math.min(a,b), Math.min(length(), Math.max(a,b) + 1)); }
     private void insertAt(int at) { setCaret(at); mode = VimMode.INSERT; reset(); }
     private void openLine(boolean below) { int p = below ? lineEnd(caret()) : lineStart(caret()); editor.replace(p,p,"\n"); setCaret(below ? p + 1 : p); mode = VimMode.INSERT; reset(); }
     private void changeRange(int start, int end, boolean lineWise) { deleteRange(start,end,lineWise); mode = VimMode.INSERT; }
-    private void deleteRange(int start, int end, boolean lineWise) { if (end <= start) return; register = new Register(text(start,end), lineWise); editor.replace(start,end,""); setCaret(Math.min(start, Math.max(0,length()-1))); escape(); }
+    private void deleteRange(int start, int end, boolean lineWise) { if (end <= start) return; register = new Register(text(start,end), lineWise); editor.replace(start,end,""); setCaret(Math.min(start, Math.max(0,length()-1))); mode=VimMode.NORMAL; editor.select(caret(),caret()); reset(); normalizeCaret(); }
     private void yankRange(int start, int end, boolean lineWise) { register = new Register(text(start,end), lineWise); escape(); }
     private void paste(boolean before) { if (register.text().isEmpty()) return; int p = caret(); if (register.lineWise()) { p = before ? lineStart(p) : lineEndWithNewline(p); editor.replace(p,p,register.text()); setCaret(p); } else { p = before ? p : Math.min(length(),p+1); editor.replace(p,p,register.text()); setCaret(p + register.text().length()-1); } }
     private void replaceChar(String value) { if (length() > 0) { int p=caret(); editor.replace(p, Math.min(length(),p+1),value); setCaret(p); } }
     private void join(int n) { for(int i=0;i<n;i++) { int e=lineEnd(caret()); if(e>=length()) break; int next=e+1; while(next<length() && Character.isWhitespace(charAt(next)) && charAt(next)!='\n') next++; editor.replace(e,next," "); } }
 
     private void move(String key, int n) { setCaret(motionTarget(key,n)); }
-    private int motionTarget(String key, int n) {
-        int p=caret();
+    private int motionTarget(String key, int n) { return motionTarget(caret(), key, n); }
+    private int motionTarget(int p, String key, int n) {
         return switch(key) {
             case "h" -> Math.max(0,p-n); case "l" -> Math.min(Math.max(0,length()-1),p+n);
             case "j" -> vertical(p,n); case "k" -> vertical(p,-n);
@@ -146,7 +150,7 @@ public final class VimEngine {
     private void searchKey(String key) { if("<Enter>".equals(key)) { mode=VimMode.NORMAL; find(search,searchForward); } else if(key.length()==1) search += key; }
     private void repeatSearch(boolean reverse) { if(!search.isEmpty()) find(search, reverse ? !searchForward : searchForward); }
     private void find(String pattern, boolean forward) { if(pattern.isEmpty()) return; String t=editor.getText(); int from=caret(); int hit=forward?t.indexOf(pattern,Math.min(t.length(),from+1)):t.lastIndexOf(pattern,Math.max(0,from-1)); if(hit<0&&searchWrap) hit=forward?t.indexOf(pattern):t.lastIndexOf(pattern); if(hit>=0) setCaret(hit); }
-    private void escape() { mode=VimMode.NORMAL; editor.select(caret(),caret()); reset(); normalizeCaret(); }
+    private void escape() { if (mode == VimMode.VISUAL || mode == VimMode.VISUAL_LINE) setCaret(visualCursor); mode=VimMode.NORMAL; editor.select(caret(),caret()); reset(); normalizeCaret(); }
     private void reset() { count=0; pendingOperator=null; operatorCount=1; pending=null; }
     private int takeCount() { int n=count==0?1:count; count=0; return n; }
     private boolean isMotion(String key) { return "h j k l w b e 0 ^ $ { } <C-d> <C-u>".contains(key); }

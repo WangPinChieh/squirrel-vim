@@ -37,6 +37,12 @@ public final class VimEngineTest {
     private static void visualAndSearch() {
         Fake e=new Fake("alpha beta\nalpha"); VimEngine v=new VimEngine(e);
         v.key("v");v.key("l");v.key("y");eq("al",v.getRegister().text());eq(VimMode.NORMAL,v.getMode());
+        e = new Fake("one\ntwo\nthree"); v = new VimEngine(e);
+        v.key("j"); v.key("V"); v.key("j"); v.key("k");
+        eq(4, e.getSelectionStart()); eq(8, e.getSelectionEnd());
+        v.key("k");
+        eq(0, e.getSelectionStart()); eq(8, e.getSelectionEnd());
+        e = new Fake("alpha beta\nalpha"); v = new VimEngine(e);
         v.key("/"); for(char c:"beta".toCharArray())v.key(String.valueOf(c));v.key("<Enter>");eq(6,e.getCaretOffset());
         v.key("n");eq(6,e.getCaretOffset()); v.key("?");for(char c:"alpha".toCharArray())v.key(String.valueOf(c));v.key("<Enter>");eq(0,e.getCaretOffset());
     }
@@ -50,7 +56,7 @@ public final class VimEngineTest {
         private String text; private int caret; private int start,end;
         Fake(String text){this.text=text;}
         public String getText(){return text;} public void replace(int s,int e,String value){text=text.substring(0,s)+value+text.substring(e);caret=s+value.length();}
-        public int getCaretOffset(){return caret;} public void setCaretOffset(int o){caret=o;} public void select(int s,int e){start=s;end=e;}
+        public int getCaretOffset(){return caret;} public void setCaretOffset(int o){caret=o;} public void select(int s,int e){start=s;end=e;caret=e;}
         public int getSelectionStart(){return start;} public int getSelectionEnd(){return end;} public void undo(){} public void redo(){}
     }
 }
